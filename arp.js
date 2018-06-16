@@ -15,7 +15,7 @@ const fixTime = 30
 
 const nodeNIP = '10.11.160.1'
 const nName = 'Nodesad'
-const firebaseKey = '-L46xegEleuKcTnJXDjB'
+const firebaseKey = '-L46xegEleuKcTnJXDjE'
 /* root / root1234 10.4.15.1  192.168.1.254*/ 
 const {exec} = require('child_process')
 

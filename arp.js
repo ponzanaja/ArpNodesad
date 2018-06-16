@@ -1,4 +1,4 @@
-/*Testing Update texting from web 1 .....................................*/
+/*Testing Update texting from web */
 const express = require('express')
 const firebase = require('firebase')
 const snmp = require('snmp-native')
@@ -11,11 +11,11 @@ const pktsInErrOID = [1, 3, 6, 1, 2, 1, 2, 2, 1, 14]
 const pktsOutErrOID = [1, 3, 6, 1, 2, 1, 2, 2, 1, 14]
 const intNameOID = [1, 3, 6, 1, 2, 1, 2, 2, 1, 2]
 const intSpeed = [1, 3, 6, 1, 2, 1, 2, 2, 1, 5]
+const fixTime = 30
 
-
-const nodeNIP = '10.4.15.1'
+const nodeNIP = '10.11.160.1'
 const nName = 'Nodesad'
-const firebaseKey = '-L46xegEleuKcTnJXDjE'
+const firebaseKey = '-L46xegEleuKcTnJXDjB'
 /* root / root1234 10.4.15.1  192.168.1.254*/ 
 const {exec} = require('child_process')
 
@@ -64,10 +64,38 @@ let packetloss = 0
 let temparature = 0
 let humanity = 0
 let temparatureSw = 0
-
+let iplist = []
+let flagSend = false
 /// //////////////////// Network variable End here ///////////////////////
 
 /* ---------------------------------------------------------------------- */
+setInterval(() => { 
+    let now = new Date()
+    let date = dateFormat(now, 'd/m/yyyy')
+    let time = dateFormat(now, 'HH:MM:ss')
+    let minutes = now.getMinutes()
+    if(minutes === fixTime && !(flagSend)){
+        speedTest().then((result) => {
+            let newResult = result.replace(/(\r\n|\n|\r)/gm, '')
+            let indexOfdownload = newResult.indexOf('M')
+            let indexOfupload = newResult.indexOf('s')
+            let indexOfupload2 = newResult.lastIndexOf('M')
+            download = newResult.slice(0, indexOfdownload)
+            upload = newResult.slice(indexOfupload + 1, indexOfupload2)
+            download = download.trim()
+            upload = upload.trim()
+            firebase.database().ref().child('db/'+firebaseKey+'/speedtest').push({
+                    valuedown: download,
+                    valueup: upload,
+                    date: date,
+                    time: time  
+            })
+          })
+          flagSend = true
+    }else if(minutes !== fixTime){
+        flagSend = false
+    }
+},30000)
 
 setInterval(() => {
   /// //////////////////// Date variable Start here ///////////////////////
@@ -77,16 +105,6 @@ setInterval(() => {
   /// //////////////////// Date variable End here ////////////////////////
   showResult()
   sendtoFirebase(nName, date, time)
-  speedTest().then((result) => {
-    let newResult = result.replace(/(\r\n|\n|\r)/gm, '')
-    let indexOfdownload = newResult.indexOf('M')
-    let indexOfupload = newResult.indexOf('s')
-    let indexOfupload2 = newResult.lastIndexOf('M')
-    download = newResult.slice(0, indexOfdownload)
-    upload = newResult.slice(indexOfupload + 1, indexOfupload2)
-    download = download.trim()
-    upload = upload.trim()
-  })
   getMIB(nName, date, time)
   sendTemparature().then((result) => {
     let newResult = result.replace(/(\r\n|\n|\r)/gm, '')
@@ -114,6 +132,9 @@ function showResult () {
     let lastOfIndex = dataGet.lastIndexOf('host')
     let onlineUser = dataGet.slice(indexOfuser + 1, lastOfIndex-1)
     online = onlineUser
+    let re = /(\d{1,3}.\d{1,3}.\d{1,3}.\d{1,3})\n/g
+    let found = data.match(re)
+    iplist = found.map(found => found.trim())
   }).catch((error) => {
     console.error(error.message)
   })
@@ -147,12 +168,6 @@ function sendtoFirebase (nodeName, date, time) {
     valuet: temparature,
     valueswtemp: temparatureSw
   }
-  let spdtestData = {
-    valuedown: download,
-    valueup: upload,
-    date: date,
-    time: time
-  }
   if (check) {
     if(humanity !== "ron" && temparature !== "Wrong"){
       firebase.database().ref('db/'+ firebaseKey).update({
@@ -168,7 +183,6 @@ function sendtoFirebase (nodeName, date, time) {
       alive:true,
       alive2:true
     })
-    firebase.database().ref().child('db/'+firebaseKey+'/speedtest').push(spdtestData)
   } else {
     let sendData = {
       node: nodeName,
@@ -280,8 +294,8 @@ function getMIB (nodeName, date, time) {
       })
        //console.log("countInterface = " + countInterface)  // out commend for checking data
     }
-      sumInbound += inbound[23].inbound
-      sumOutbound += outbound[23].outbound
+      sumInbound += inbound[8].inbound
+      sumOutbound += outbound[8].outbound
    // console.log('Sum inbound : ' + sumInbound)
     // console.log('Sum PacketIn :' + sumInpkts)
     // console.log('Packetloss : ' + packetloss)
@@ -321,8 +335,8 @@ function getMIB (nodeName, date, time) {
       time: time
     }
     setTimeout(() => {   
-      let inb =  inbound[23].inbound
-      let outb = outbound[23].outbound 
+      let inb =  inbound[8].inbound
+      let outb = outbound[8].outbound 
       let mainlinkData = {
         in: inb,
         out: outb
@@ -331,14 +345,15 @@ function getMIB (nodeName, date, time) {
     }, 3000)
 
     setTimeout(() => {  
-    let sumInterface = intSpd[23].intSpd/1048576
-    console.log(sumInterface)
+    let sumInterface = intSpd[8].intSpd/1048576
+    //console.log(sumInterface)
       console.log(insertIn)
       firebase.database().ref().child('db/'+firebaseKey+'/inbound').push(insertIn)
       firebase.database().ref().child('db/'+firebaseKey+'/outbound').push(insertOut)
       firebase.database().ref().child('db/'+firebaseKey+'/packetloss').set(packetloss)
        firebase.database().ref().child('db/'+firebaseKey+'/node').set(nName)
       firebase.database().ref().child('db/'+firebaseKey+'/sumInterface').set(sumInterface)
+      firebase.database().ref().child('db/'+firebaseKey+'/iplist').set(iplist)
     }, 9000)
       
    
